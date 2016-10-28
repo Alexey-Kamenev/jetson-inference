@@ -122,6 +122,67 @@ cudaError_t cudaYUYVToRGBA( uchar2* input, size_t inputPitch, uchar4* output, si
 	return launchYUYV<false>(input, inputPitch, output, outputPitch, width, height);
 }
 
+__global__ void yuyvToRgbaf(uchar4* src, int srcAlignedWidth, float4* dst, int dstAlignedWidth, int width, int height )
+{
+	const int x = blockIdx.x * blockDim.x + threadIdx.x;
+	const int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+	if( x >= srcAlignedWidth || y >= height )
+		return;
+
+	const uchar4 macroPx = src[y * srcAlignedWidth + x];
+
+	// Y0 is the brightness of pixel 0, Y1 the brightness of pixel 1.
+	// U0 and V0 is the color of both pixels.
+	// YUYV [ Y0 | U0 | Y1 | V0 ]
+	const float y0 = macroPx.x;
+	const float y1 = macroPx.z; 
+	const float u = macroPx.y - 128.0f;
+	const float v = macroPx.w - 128.0f;
+
+	const float4 px0 = make_float4(y0 + 1.4065f * v,
+								y0 - 0.3455f * u - 0.7169f * v,
+								y0 + 1.7790f * u, 255.0f );
+
+	const float4 px1 = make_float4(y1 + 1.4065f * v,
+							  y1 - 0.3455f * u - 0.7169f * v,
+							  y1 + 1.7790f * u, 255.0f);
+
+	//dst[y * dstAlignedWidth + x * 2] = make_float4(255.0, 0, 0, 0);
+	//dst[y * dstAlignedWidth + x * 2 + 1] = make_float4(0, 255.0, 0, 0);
+	
+	dst[y * dstAlignedWidth + x * 2] = make_float4(clamp(px0.x, 0.0f, 255.0f), 
+									    clamp(px0.y, 0.0f, 255.0f),
+									    clamp(px0.z, 0.0f, 255.0f),
+									    clamp(px0.w, 0.0f, 255.0f));
+	dst[y * dstAlignedWidth + x * 2 + 1] = make_float4(clamp(px1.x, 0.0f, 255.0f),
+									    clamp(px1.y, 0.0f, 255.0f),
+									    clamp(px1.z, 0.0f, 255.0f),
+									    clamp(px1.w, 0.0f, 255.0f));
+} 
+
+cudaError_t launchYUYVf(uchar2* input, size_t inputPitch, float4* output, size_t outputPitch, size_t width, size_t height)
+{
+	if( !input || !inputPitch || !output || !outputPitch || !width || !height )
+		return cudaErrorInvalidValue;
+
+	const dim3 block(8,8);
+	const dim3 grid(iDivUp(width/2, block.x), iDivUp(height, block.y));
+
+	const int srcAlignedWidth = inputPitch / sizeof(uchar4);
+	const int dstAlignedWidth = outputPitch / sizeof(float4);
+
+	//printf("yuyvToRgba %zu %zu %i %i %i %i\n", width, height, srcAlignedWidth, dstAlignedWidth, grid.x, grid.y);
+
+	yuyvToRgbaf<<<grid, block>>>((uchar4*)input, srcAlignedWidth, output, dstAlignedWidth, width, height);
+
+	return CUDA(cudaGetLastError());
+}
+
+cudaError_t cudaYUYVToRGBAf(uchar2 *input, float4 *output, size_t width, size_t height)
+{
+	return launchYUYVf(input, width * sizeof(uchar2), output, width * sizeof(float4), width, height);
+}
 
 //-----------------------------------------------------------------------------------
 // YUYV/UYVY to grayscale

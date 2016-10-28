@@ -10,7 +10,7 @@
 
 #include "cudaNormalize.h"
 #include "cudaFont.h"
-#include "imageNet.h"
+#include "trailsNet.h"
 
 bool signal_recieved = false;
 
@@ -33,19 +33,17 @@ int main( int argc, char** argv )
 
     printf("\n\n");
 
-    // /*
-    //  * parse network type from CLI arguments
-    //  */
-    // imageNet::NetworkType networkType = imageNet::GOOGLENET;
-
-    // if( argc > 1 && strcmp(argv[1], "alexnet") == 0 )
-    // 	networkType = imageNet::ALEXNET;
+    if(argc < 3)
+    {
+        printf("Usage: trails <.prototxt file> <model bin file>\n\n");
+        return 1;
+    }
 
     if (signal(SIGINT, sig_handler) == SIG_ERR)
         printf("\ncan't catch SIGINT\n");
 
-    //gstCamera* camera = gstCamera::Create();
-    v4l2Camera* camera = v4l2Camera::Create("/dev/video1");
+    gstCamera* camera = gstCamera::Create();
+    //v4l2Camera* camera = v4l2Camera::Create("/dev/video1");
 
     if( !camera )
     {
@@ -58,16 +56,13 @@ int main( int argc, char** argv )
     printf("   height:  %u\n", camera->GetHeight());
     printf("    depth:  %u (bpp)\n\n", camera->GetPixelDepth());
 
-    // /*
-    //  * create imageNet
-    //  */
-    // imageNet* net = imageNet::Create(networkType);
+    auto net = trailsNet::Create(argv[1], argv[2]);
 
-    // if( !net )
-    // {
-    // 	printf("imagenet-console:   failed to initialize imageNet\n");
-    // 	return 0;
-    // }
+    if (net == nullptr)
+    {
+        printf("trails:   failed to load a model\n");
+        return 2;
+    }
 
     glDisplay *display = glDisplay::Create();
     glTexture *texture = NULL;
@@ -103,27 +98,26 @@ int main( int argc, char** argv )
         void *imgRGBA = NULL;
 
         // get the latest frame
-        imgRGBA = camera->Capture(1000);
-        if (imgRGBA == nullptr)
+        //imgRGBA = camera->Capture(1000);
+        //if (imgRGBA == nullptr)
+        //else
+        //	printf("trails:  recieved new frame  CPU=0x%p  GPU=0x%p\n", imgCPU, imgCUDA);
+
+        // get the latest frame
+        if (!camera->Capture(&imgCPU, &imgCUDA, 1000))
             printf("\ntrails:  failed to capture frame\n");
         //else
         //	printf("trails:  recieved new frame  CPU=0x%p  GPU=0x%p\n", imgCPU, imgCUDA);
 
-    //     // get the latest frame
-    //     if (!camera->Capture(&imgCPU, &imgCUDA, 1000))
-    //         printf("\ntrails:  failed to capture frame\n");
-    //     //else
-    //     //	printf("trails:  recieved new frame  CPU=0x%p  GPU=0x%p\n", imgCPU, imgCUDA);
+        // convert from YUV to RGBA
+        //void *imgRGBA = NULL;
 
-    //     // convert from YUV to RGBA
-    //     void *imgRGBA = NULL;
+        if (!camera->ConvertRGBA(imgCUDA, &imgRGBA))
+            printf("trails:  failed to convert from NV12 to RGBA\n");
 
-    //     if (!camera->ConvertRGBA(imgCUDA, &imgRGBA))
-    //         printf("trails:  failed to convert from NV12 to RGBA\n");
-
-    //     // classify image
-    //     //const int img_class = net->Classify((float *)imgRGBA, camera->GetWidth(), camera->GetHeight(), &confidence);
-        const int img_class = 10;
+        // classify image
+        const int img_class = net->Classify((float *)imgRGBA, camera->GetWidth(), camera->GetHeight(), &confidence);
+        //const int img_class = 10;
 
         if (img_class >= 0)
         {
@@ -132,8 +126,8 @@ int main( int argc, char** argv )
             if (font != NULL)
             {
                 char str[256];
-                //sprintf(str, "%05.2f%% %s", confidence * 100.0f, net->GetClassDesc(img_class));
-                sprintf(str, "%05.2f%% Test", confidence * 100.0f);
+                sprintf(str, "%05.2f%% %s (%d)", confidence * 100.0f, net->GetClassDesc(img_class), img_class);
+                //sprintf(str, "%05.2f%% (%d)", confidence * 100.0f, img_class);
 
                 font->RenderOverlay((float4*)imgRGBA, (float4*)imgRGBA, camera->GetWidth(), camera->GetHeight(),
                                     str, 0, 0, make_float4(255.0f, 255.0f, 255.0f, 255.0f));

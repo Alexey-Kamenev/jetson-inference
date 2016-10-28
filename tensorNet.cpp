@@ -84,6 +84,7 @@ bool tensorNet::ProfileModel(const std::string& deployFile,			   // name for caf
 	
 	// the caffe file has no notion of outputs, so we need to manually say which tensors the engine should generate	
 	const size_t num_outputs = outputs.size();
+	printf("num_outputs: %d\n", num_outputs);
 	
 	for( size_t n=0; n < num_outputs; n++ )
 		network->markOutput(*blobNameToTensor->find(outputs[n].c_str()));

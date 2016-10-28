@@ -71,7 +71,9 @@ bool gstCamera::ConvertRGBA( void* input, void** output )
 		}
 	}
 	
-	if( CUDA_FAILED(cudaNV12ToRGBAf((uint8_t*)input, (float4*)mRGBA, mWidth, mHeight)) )
+	// if( CUDA_FAILED(cudaNV12ToRGBAf((uint8_t*)input, (float4*)mRGBA, mWidth, mHeight)) )
+	// 	return false;
+	if( CUDA_FAILED(cudaYUYVToRGBAf((uchar2*)input, (float4*)mRGBA, mWidth, mHeight)) )
 		return false;
 	
 	*output = mRGBA;
@@ -265,13 +267,18 @@ bool gstCamera::buildLaunchStr()
 	
 //#define CAPS_STR "video/x-raw(memory:NVMM), width=(int)2592, height=(int)1944, format=(string)I420, framerate=(fraction)30/1"
 //#define CAPS_STR "video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, format=(string)I420, framerate=(fraction)30/1"
-	mWidth     = 1280;
-	mHeight    = 720;
-	mDepth     = 12;
+	// mWidth     = 1280;
+	// mHeight    = 720;
+	// mDepth     = 12;
+	mWidth     = 352;
+	mHeight    = 288;
+	mDepth     = 16;
 	mSize      = (mWidth * mHeight * mDepth) / 8;
 	
-	ss << "nvcamerasrc fpsRange=\"30.0 30.0\" ! video/x-raw(memory:NVMM), width=(int)" << mWidth << ", height=(int)" << mHeight << ", format=(string)NV12 ! nvvidconv flip-method=2 ! "; //'video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, format=(string)I420, framerate=(fraction)30/1' ! ";
-	ss << "video/x-raw ! appsink name=mysink";
+	// ss << "nvcamerasrc fpsRange=\"30.0 30.0\" ! video/x-raw(memory:NVMM), width=(int)" << mWidth << ", height=(int)" << mHeight << ", format=(string)NV12 ! nvvidconv flip-method=2 ! "; //'video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080, format=(string)I420, framerate=(fraction)30/1' ! ";
+	// ss << "video/x-raw ! appsink name=mysink";
+	ss << "v4l2src device=\"/dev/video1\" ! video/x-raw, width=(int)" << mWidth << ", height=(int)" << mHeight << ", format=(string)YUY2 ! appsink name=mysink";
+	//ss << "v4l2src device=\"/dev/video1\" ! video/x-raw, width=(int)352, height=(int)288, format=(string)YV12 ! appsink name=mysink";
 	
 	mLaunchStr = ss.str();
 

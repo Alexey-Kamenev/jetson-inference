@@ -65,6 +65,8 @@ cudaError_t cudaYUYVToRGBA( uchar2* input, uchar4* output, size_t width, size_t 
  */
 cudaError_t cudaYUYVToRGBA( uchar2* input, size_t inputPitch, uchar4* output, size_t outputPitch, size_t width, size_t height );
 
+cudaError_t cudaYUYVToRGBAf(uchar2 *input, float4 *output, size_t width, size_t height);
+
 ///@}
 
 
